@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MERIDIAN RUN — Dawn Courier over the Kestrel Isles</title>
+<link rel="icon" href="data:,">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1a2436;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif; color: #ffe9b8; }
+  #game-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* ---- HUD ---- */
+  #hud { position: fixed; inset: 0; pointer-events: none; display: none;
+    text-shadow: 0 1px 3px rgba(0,0,0,.8); z-index: 5; }
+  .panel { background: rgba(10, 18, 34, 0.55); border: 1px solid rgba(255, 233, 184, 0.35);
+    border-radius: 10px; padding: 10px 14px; backdrop-filter: blur(2px); }
+  .instruments { position: absolute; top: 14px; left: 14px; display: flex; gap: 10px; }
+  .gauge { min-width: 92px; text-align: center; }
+  .gauge .label { font-size: 11px; letter-spacing: 2px; color: #b8c8e0; }
+  .gauge .value { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums;
+    line-height: 1.1; color: #ffe9b8; }
+  .gauge .unit { font-size: 12px; color: #b8c8e0; }
+  .status { position: absolute; top: 14px; right: 14px; width: 230px; }
+  .status .row { display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 13px; letter-spacing: 1px; margin-bottom: 6px; }
+  .bar-track { height: 10px; background: rgba(255,255,255,.15); border-radius: 5px;
+    overflow: hidden; margin: 2px 0 8px; }
+  .bar-fill { height: 100%; border-radius: 5px; transition: width .2s; }
+  .score-line { font-size: 22px; font-weight: 700; }
+  .score-line .label { font-size: 12px; color: #b8c8e0; letter-spacing: 2px; }
+  .lower-left { position: absolute; left: 14px; bottom: 14px; display: flex; gap: 10px;
+    align-items: flex-end; }
+  #attitude { border-radius: 50%; border: 2px solid rgba(255,233,184,.5);
+    background: rgba(10,18,34,.55); }
+  .throttle-box { width: 150px; }
+  .objective-bar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+    text-align: center; max-width: 620px; }
+  .objective-bar .mission-name { font-size: 13px; letter-spacing: 3px; color: #ffb347;
+    font-weight: 700; }
+  .objective-bar .objective { font-size: 17px; font-weight: 600; margin-top: 2px; }
+  #hud-message { position: absolute; left: 50%; top: 18%; transform: translateX(-50%);
+    font-size: 26px; font-weight: 700; color: #ffe9b8; text-align: center;
+    transition: opacity .4s; white-space: nowrap; }
+  #hud-warn { position: absolute; left: 50%; top: 26%; transform: translateX(-50%);
+    font-size: 20px; font-weight: 700; color: #ff6b5e; text-align: center;
+    transition: opacity .3s; white-space: nowrap; }
+  #hud-target { font-size: 13px; letter-spacing: 2px; color: #b8c8e0; }
+
+  /* ---- Title screen ---- */
+  #title-screen { position: fixed; inset: 0; z-index: 10; display: flex;
+    flex-direction: column; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, rgba(10,18,34,.25) 0%, rgba(10,18,34,.55) 55%,
+      rgba(10,18,34,.85) 100%); text-align: center; padding: 20px; }
+  #title-screen h1 { font-size: 64px; letter-spacing: 8px; font-weight: 800;
+    color: #ffe9b8; text-shadow: 0 3px 18px rgba(0,0,0,.7); }
+  #title-screen h2 { font-size: 20px; letter-spacing: 4px; font-weight: 400;
+    color: #ffb347; margin: 6px 0 22px; }
+  #title-screen .tagline { font-size: 16px; color: #dfe8f5; max-width: 640px;
+    line-height: 1.5; margin-bottom: 24px; }
+  .mission-cards { display: flex; gap: 14px; margin-bottom: 22px; }
+  .mission-card { pointer-events: auto; cursor: pointer; width: 220px; padding: 16px;
+    background: rgba(10,18,34,.72); border: 1px solid rgba(255,233,184,.4);
+    border-radius: 12px; transition: transform .15s, border-color .15s; }
+  .mission-card:hover { transform: translateY(-4px); border-color: #ffb347; }
+  .mission-card .key { display: inline-block; font-size: 12px; font-weight: 700;
+    border: 1px solid #ffb347; border-radius: 4px; padding: 1px 7px; color: #ffb347;
+    margin-bottom: 8px; }
+  .mission-card h3 { font-size: 19px; letter-spacing: 1px; margin-bottom: 4px; }
+  .mission-card .tag { font-size: 13px; color: #b8c8e0; margin-bottom: 8px; }
+  .mission-card p { font-size: 13px; line-height: 1.45; color: #dfe8f5; }
+  .controls { font-size: 13px; color: #b8c8e0; line-height: 1.7; margin-bottom: 20px; }
+  .controls b { color: #ffe9b8; }
+  #title-start { pointer-events: auto; cursor: pointer; font-size: 18px; font-weight: 700;
+    letter-spacing: 2px; color: #1a2436; background: #ffb347; border: none;
+    border-radius: 10px; padding: 13px 34px; }
+  #title-start:hover { background: #ffc46b; }
+  .title-foot { margin-top: 16px; font-size: 12px; color: #8fa0b8; }
+
+  /* ---- Debrief ---- */
+  #debrief-screen { position: fixed; inset: 0; z-index: 9; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(10,18,34,.55); text-align: center; pointer-events: none; }
+  #debrief-screen h2 { font-size: 40px; letter-spacing: 6px; }
+  .debrief-mission { font-size: 16px; letter-spacing: 3px; color: #ffb347; margin: 8px 0; }
+  .debrief-score { font-size: 26px; margin: 8px 0; }
+  .debrief-score b { color: #7dff9a; }
+  .debrief-details { font-size: 15px; line-height: 1.8; color: #dfe8f5; }
+  .debrief-hint { margin-top: 16px; font-size: 14px; color: #b8c8e0; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+
+<div id="hud">
+  <div class="instruments">
+    <div class="panel gauge"><div class="label">ALTITUDE</div><div class="value" id="hud-alt">0 m</div></div>
+    <div class="panel gauge"><div class="label">SPEED</div><div class="value" id="hud-spd">0 kt</div></div>
+    <div class="panel gauge"><div class="label">HEADING</div><div class="value" id="hud-hdg">000</div><div class="unit" id="hud-compass">E</div></div>
+  </div>
+  <div class="panel status">
+    <div class="row"><span id="hud-fuel-text">FUEL 100%</span><span id="hud-timer">0:00</span></div>
+    <div class="bar-track"><div class="bar-fill" id="hud-fuel-bar" style="width:100%;background:#7dff9a"></div></div>
+    <div class="row"><span id="hud-dmg-text">DMG 0%</span></div>
+    <div class="bar-track"><div class="bar-fill" id="hud-dmg-bar" style="width:0%;background:#ff6b5e"></div></div>
+    <div class="row"><span id="hud-target" style="color:#b8c8e0"></span></div>
+    <div class="score-line"><span class="label">SCORE&nbsp;</span><span id="hud-score">0</span></div>
+  </div>
+  <div class="lower-left">
+    <canvas id="attitude" width="110" height="110"></canvas>
+    <div class="panel throttle-box">
+      <div class="row" style="display:flex;justify-content:space-between;font-size:13px;letter-spacing:1px"><span id="hud-throttle-text">THR 0%</span></div>
+      <div class="bar-track"><div class="bar-fill" id="hud-throttle-bar" style="width:0%;background:#ffb347"></div></div>
+      <div style="font-size:11px;color:#b8c8e0">W/S throttle · arrows fly · mouse steers · wheel trims</div>
+    </div>
+  </div>
+  <div class="panel objective-bar">
+    <div class="mission-name" id="hud-mission">RING RUN</div>
+    <div class="objective" id="hud-objective"></div>
+  </div>
+  <div id="hud-message"></div>
+  <div id="hud-warn"></div>
+</div>
+
+<div id="title-screen">
+  <h1>MERIDIAN RUN</h1>
+  <h2>DAWN COURIER OVER THE KESTREL ISLES</h2>
+  <p class="tagline">You fly the Kestrel Courier K-7, the only mail plane that still runs the
+    dawn route between the isles. Throttle, turn and fuel are yours to manage —
+    the sea below is not forgiving, and the runway at Meridian Field is the only
+    safe ground for a hundred miles.</p>
+  <div class="mission-cards">
+    <div class="mission-card" data-mission="rings">
+      <span class="key">1</span><h3>RING RUN</h3><div class="tag">Fly the dawn circuit</div>
+      <p>Thread eight signal rings over the isles, in order. Smooth turns pay.</p>
+    </div>
+    <div class="mission-card" data-mission="cargo">
+      <span class="key">2</span><h3>CARGO DROP</h3><div class="tag">Supplies for the far isles</div>
+      <p>Drop three crates on the glowing beacons. Closer to the mark, bigger the pay.</p>
+    </div>
+    <div class="mission-card" data-mission="landing">
+      <span class="key">3</span><h3>RUNWAY LANDING</h3><div class="tag">Bring her home gentle</div>
+      <p>Climb, circle the beacon, land on Meridian Field. A perfect touchdown pays 500.</p>
+    </div>
+  </div>
+  <div class="controls">
+    <b>W / S</b> throttle &nbsp;·&nbsp; <b>↑ ↓</b> pitch &nbsp;·&nbsp; <b>← → / A D</b> bank &amp; turn
+    &nbsp;·&nbsp; <b>Mouse</b> steer &nbsp;·&nbsp; <b>Wheel</b> trim throttle<br>
+    <b>SPACE</b> drop cargo &nbsp;·&nbsp; <b>R</b> restart sortie &nbsp;·&nbsp; <b>P</b> pause &nbsp;·&nbsp; <b>M</b> mute
+  </div>
+  <button id="title-start">FLY THE DAWN ROUTE</button>
+  <div class="title-foot">Land on the strip to refuel · Hard hits cost damage · Fuel empty means glide</div>
+</div>
+
+<div id="debrief-screen"></div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
